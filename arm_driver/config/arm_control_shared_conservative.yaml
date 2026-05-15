@@ -1,0 +1,31 @@
+arm_control_node:
+  ros__parameters:
+    shared_control_height_m: 0.08
+    max_joystick_offset_x_m: 0.016
+    max_joystick_offset_y_m: 0.016
+    max_virtual_correction_x_m: 0.016
+    max_virtual_correction_y_m: 0.016
+    joystick_follow_scale_x_m: 0.016
+    joystick_follow_scale_y_m: 0.016
+    virtual_force_gain_x_m_per_n: 0.0009
+    virtual_force_gain_y_m_per_n: 0.0009
+    authority_force_start_n: 1.0
+    authority_force_full_n: 4.0
+    laser_recenter_gain: 1.00
+    smooth_alpha: 0.06
+    gripper_contact_required: false
+    gripper_relief_angle: 0.15
+    pinch_contact_hold_s: 0.50
+    pinch_close_rate_per_s: 0.60
+    grip_hold_open_offset: 0.03
+    use_fixed_grip_hold_angle: true
+    fixed_grip_hold_angle: 0.10
+    shared_contact_loss_timeout_s: 0.60
+    return_home_on_shutdown: true
+    shutdown_step_duration_s: 1.20
+    shutdown_spin_dt_s: 0.05
+    regrasp_relief_duration_s: 0.50
+    regrasp_max_attempts: 3
+    shared_idle_open_extra_m: 0.020
+    shared_control_lock_state: true
+    shared_control_bypass_fsr: true

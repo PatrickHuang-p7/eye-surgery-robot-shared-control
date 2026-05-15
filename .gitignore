@@ -1,0 +1,29 @@
+# Mac 隐藏缓存
+.DS_Store
+._*
+
+# ROS 2 与 Python 缓存
+__pycache__/
+*.pyc
+*.log
+.pytest_cache/
+
+# 如果你以后在 Mac 上不小心执行了 colcon build，屏蔽这些目录
+build/
+install/
+log/
+
+# 本机实验输出与 rosbag 数据
+experiment_outputs/
+rosbag2_*/
+*.db3
+*.mcap
+*.bag
+
+# 共享控制离线扫描结果
+shared_control_param_sweep*.csv
+shared_control_experiment_analysis*.csv
+shared_control_experiment_plots/
+
+# VS Code 配置文件（可选，团队协作通常不传本地配置）
+.vscode/

@@ -1,0 +1,25 @@
+hardware_adc_node:
+  ros__parameters:
+    joystick_only_mode: false
+    enable_grip_sensor_fault_detection: false
+    joy_center_x: 1.622
+    joy_center_y: 1.677
+    joy_span_x: 1.65
+    joy_span_y: 1.65
+    joy_deadband: 0.08
+    invert_joy_x: false
+    invert_joy_y: false
+    joy_voltage_jump_threshold: 0.25
+    joy_confirm_samples: 3
+    joy_ema_alpha: 0.20
+    grip_contact_threshold_left_n: 11.0
+    grip_contact_threshold_right_n: 8.5
+    grip_contact_release_left_n: 7.0
+    grip_contact_release_right_n: 5.5
+    grip_overpressure_threshold_left_n: 19.4
+    grip_overpressure_threshold_right_n: 15.2
+    grip_require_both_contact: false
+    use_left_fsr_for_contact: false
+    use_right_fsr_for_contact: true
+    use_left_fsr_for_overpressure: false
+    use_right_fsr_for_overpressure: true

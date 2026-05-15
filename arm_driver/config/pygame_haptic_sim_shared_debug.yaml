@@ -1,0 +1,20 @@
+pygame_haptic_sim_node:
+  ros__parameters:
+    screen_width: 960
+    screen_height: 720
+    render_fps: 60.0
+    safe_zone_radius_px: 220.0
+    buffer_width_px: 60.0
+    max_force_n: 8.0
+    laser_speed_px_per_s: 260.0
+    laser_input_exponent: 1.6
+    laser_max_speed_px_per_s: 140.0
+    laser_max_accel_px_per_s2: 420.0
+    laser_limit_radius_px: 320.0
+    shared_feedback_scale: 1.0
+    trail_enabled: true
+    trail_max_points: 1500
+    trail_line_width: 3
+    trail_min_point_distance_px: 1.5
+    enable_capture_hotkey: false
+    capture_output_dir: /tmp/pygame_haptic_sim_captures

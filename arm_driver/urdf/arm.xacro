@@ -1,0 +1,119 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="fashion_arm">
+
+    <xacro:property name="L_LINK" value="0.0814"/>    <xacro:property name="L_END" value="0.140"/>      <xacro:property name="H_BASE" value="0.06"/>      <xacro:property name="RADIUS" value="0.02"/>      
+    
+    <material name="blue"><color rgba="0 0 0.8 1"/></material>
+    <material name="white"><color rgba="1 1 1 1"/></material>
+    <material name="black"><color rgba="0 0 0 1"/></material>
+    <material name="grey"><color rgba="0.5 0.5 0.5 1"/></material>
+
+    <xacro:macro name="arm_link" params="link_name length color">
+        <link name="${link_name}">
+            <visual>
+                <origin xyz="0 0 ${length/2}" rpy="0 0 0"/> 
+                <geometry>
+                    <cylinder length="${length}" radius="${RADIUS}"/>
+                </geometry>
+                <material name="${color}"/>
+            </visual>
+            <collision>
+                <origin xyz="0 0 ${length/2}" rpy="0 0 0"/> 
+                <geometry>
+                    <cylinder length="${length}" radius="${RADIUS}"/>
+                </geometry>
+            </collision>
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="arm_joint" params="joint_name parent child origin_xyz axis_xyz upper lower">
+        <joint name="${joint_name}" type="revolute">
+            <parent link="${parent}"/>
+            <child link="${child}"/>
+            <origin xyz="${origin_xyz}" rpy="0 0 0"/> <axis xyz="${axis_xyz}"/> 
+            <limit effort="100" velocity="2.0" upper="${upper}" lower="${lower}"/>
+        </joint>
+    </xacro:macro>
+
+    <link name="base_link">
+        <visual>
+            <origin xyz="0 0 ${H_BASE/2}" rpy="0 0 0"/>
+            <geometry><cylinder length="${H_BASE}" radius="0.03"/></geometry>
+            <material name="grey"/>
+        </visual>
+    </link>
+
+    <link name="link_1">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry><sphere radius="0.025"/></geometry>
+            <material name="black"/>
+        </visual>
+    </link>
+
+    <xacro:arm_joint joint_name="joint_1" 
+                    parent="base_link" child="link_1"
+                    origin_xyz="0 0 ${H_BASE}" 
+                    axis_xyz="0 0 -1" 
+                    upper="${pi}" lower="${-pi}"/>
+
+    <xacro:arm_link link_name="link_2" length="${L_LINK}" color="blue"/>
+
+    <xacro:arm_joint joint_name="joint_2" 
+                    parent="link_1" child="link_2"
+                    origin_xyz="0 0 0" 
+                    axis_xyz="1 0 0" 
+                    upper="${pi}" lower="${-pi}"/>
+
+    <xacro:arm_link link_name="link_3" length="${L_LINK}" color="white"/>
+
+    <xacro:arm_joint joint_name="joint_3" 
+                    parent="link_2" child="link_3"
+                    origin_xyz="0 0 ${L_LINK}" 
+                    axis_xyz="-1 0 0" 
+                    upper="${pi}" lower="${-pi}"/>
+
+    <xacro:arm_link link_name="link_4" length="${L_LINK}" color="blue"/>
+
+    <xacro:arm_joint joint_name="joint_4" 
+                    parent="link_3" child="link_4"
+                    origin_xyz="0 0 ${L_LINK}" 
+                    axis_xyz="-1 0 0" 
+                    upper="${pi}" lower="${-pi}"/>
+
+    <link name="link_5">
+        <visual>
+            <geometry><box size="0.05 0.03 0.08"/></geometry> 
+            <origin xyz="0 0 0.04"/> <material name="black"/>
+        </visual>
+    </link>
+
+    <joint name="joint_5" type="prismatic">
+        <parent link="link_4"/>
+        <child link="link_5"/>
+        <origin xyz="0 0 ${L_LINK}" rpy="0 0 0"/> 
+        <axis xyz="0 1 0"/> 
+        <limit effort="100" velocity="1.0" upper="0.05" lower="0.0"/>
+    </joint>
+
+    <link name="end_effector"/>
+    <joint name="ee_fixed_joint" type="fixed">
+        <parent link="link_4"/> 
+        <child link="end_effector"/>
+        <origin xyz="0 0 ${L_END}" rpy="0 0 0"/>
+    </joint>
+
+    <ros2_control name="ArmSystem" type="system">
+      <hardware>
+        <plugin>arm_driver/UartServoHardwareInterface</plugin> 
+        <param name="serial_port">/dev/serial0</param>
+        <param name="servo_ids">1,2,3,4,5</param>
+      </hardware>
+      <joint name="joint_1"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
+      <joint name="joint_2"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
+      <joint name="joint_3"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
+      <joint name="joint_4"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
+      <joint name="joint_5"><command_interface name="position"/><state_interface name="position"/><state_interface name="velocity"/></joint>
+    </ros2_control>
+
+</robot>
