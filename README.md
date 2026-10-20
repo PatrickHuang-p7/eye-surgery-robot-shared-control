@@ -25,7 +25,7 @@ FSR x2   -> ADS1115 (A0/A1) -> hardware_adc_node -> /gripper_contact
 
 | Node | Package | Role |
 |---|---|---|
-| `hardware_adc` | `sensor_interface` | Reads the ADS1115 over I2C; publishes joystick position and FSR contact, overpressure and sensor-fault states (with confirmation and recovery sample counts) |
+| `hardware_adc` | `sensor_interface` | Reads the ADS1115 over I2C; filters each channel (single-sample jumps are held until consecutive samples agree, then EMA); publishes joystick position and FSR contact (with hysteresis), overpressure and sensor-fault states |
 | `pygame_haptic_sim` | `arm_driver` | Integrates the virtual laser point, computes the virtual-fixture force and renders the target |
 | `arm_control` | `arm_driver` | State machine (INIT → HOME → TRANSIT → HOVER → GRASP/PINCH → SHARED_CONTROL, plus RETURN_* and SAFE_HOLD) and the shared-control law |
 | `arm_driver` | `arm_driver` | Inverse kinematics and the serial bus-servo driver |
@@ -101,8 +101,17 @@ Parameter sets in `arm_driver/config/`: `baseline` (weak shared control, near-ma
 
 Operators: [[number and who]]. Reproduce with `ros2 run arm_driver shared_control_experiment_analyzer --help`.
 
+### Offline demonstration (simulation, not bench data)
+
+`docs/offline_demo/run_offline_demo.py` runs the closed-loop joystick/arm model from `shared_control_param_sweep.py` with the `baseline` and `balanced` parameter sets, using no ROS or hardware. The operator input is scripted: push +x at full deflection for 1.6 s, then release. It writes the figure below and `docs/offline_demo/offline_metrics.csv` (five scripted scenarios per configuration).
+
+![Offline simulation: laser radius and authority alpha, baseline vs balanced](docs/offline_demo/offline_push_release.png)
+
+In this model, the balanced set holds the point closer to the boundary while the operator pushes outward and returns it inside sooner after release. The baseline peak is capped by the 320 px display limit. These values come from a simplified first-order arm model and say nothing about bench performance.
+
 ## Known Limitations
 
+- FSR contact/overpressure protection gates the grasping phases only: every shared-control parameter set sets `shared_control_bypass_fsr: true`, so it is not active during shared-control trials. In the current sensor config the left FSR is excluded from contact and overpressure decisions and sensor-fault detection is off.
 - The target and laser point are virtual; overshoot is measured in screen pixels and is not converted to physical distance.
 - Validation was done on a desktop bench with [[N]] operator(s); it does not establish clinical benefit.
 - Unit tests cover the shared-control law only (`arm_driver/test/test_shared_control_math.py`); the ROS nodes and hardware drivers are tested on the bench, not automatically.
