@@ -1,12 +1,16 @@
 # Shared Control for a 4-DOF Desktop Arm (ROS 2 Humble)
 
-An operator steers a small 4-DOF arm with a joystick while a virtual laser point must stay inside a circular boundary on a simulated retinal target. The arm holds the joystick, so the controller's safety correction is applied through the same joystick the operator is moving. Inside the boundary, operator input and correction are blended; outside it, the controller takes full authority and returns the point to the safe region.
+An operator steers a small 4-DOF arm with a joystick while a virtual laser spot must stay inside a circular safe region. The 2-D task is an abstraction motivated by retinal laser positioning: three concentric zones (safe, buffer, danger) rendered in Pygame, with no anatomical model. The arm holds the joystick, so the controller's safety correction is applied through the same joystick the operator is moving. Inside the boundary, operator input and correction are blended; outside it, the controller takes full authority and returns the point to the safe region.
 
-**Scope.** This is my undergraduate thesis platform (SCUT / NUSRI, 2025–2026, supervised by Profs. Yong Zhong and Chui Chee Kong). It was evaluated on a physical desktop arm with a virtual (Pygame) target. It is a bench platform for studying shared control and is not a medical device and has not been tested in any clinical setting.
+**Scope.** This is my undergraduate thesis platform (SCUT / NUSRI, 2025–2026, supervised by Profs. Yong Zhong and Chui Chee Kong). It runs on a Raspberry Pi 4B and a physical desktop arm with a virtual (Pygame) task plane. It is a bench platform for studying shared control and is not a medical device and has not been tested in any clinical setting.
 
-Demo: [[video link]] · Thesis/paper: [[link or "available on request"]]
+Demo: [[video link, if one exists]] · Thesis: available on request
+
+![Bench setup: the arm grips a two-axis joystick](docs/images/bench_setup.jpg)
 
 ## System Overview
+
+![ROS 2 nodes and topics](docs/images/ros2_architecture.png)
 
 ```text
 Joystick -> ADS1115 (A2/A3) -> hardware_adc_node -> /joy_position
@@ -45,7 +49,7 @@ Default shared-control plane: centre `(0.22, 0.00, 0.08) m`, workspace `x = 0.22
 |---|---|
 | ROS 2 packages, node design, shared-control law, state machine, sensor processing, launch files, parameter sets, experiment tools | Me (Peiqi Huang) [[confirm; note any supervisor- or lab-provided code]] |
 | `arm_driver/arm_driver/fashion_star_sdk.py` | Fashion Star bus-servo Python SDK by the servo vendor (Shenzhen Huaxinjing Technology), used unmodified [[confirm]] |
-| Hardware: 4-DOF arm, ADS1115 ADC, FSR sensors, joystick | Commercial parts [[arm model]] |
+| Hardware: Raspberry Pi 4B, 4-DOF bus-servo arm, ADS1115 ADC, two FSRs, two-axis joystick | Commercial parts [[arm model]] |
 
 ## Requirements 
 
@@ -90,39 +94,37 @@ Parameter sets in `arm_driver/config/`: `baseline` (weak shared control, near-ma
 
 **Method.** Each trial is logged (`shared_control_trial_logger`, `shared_control_batch_bag_recorder`). `shared_control_experiment_analyzer` computes, per trial, out-of-boundary duration, boundary crossings, recovery time, peak alpha and the maximum overshoot (maximum laser radius minus safe-zone radius, in pixels of the virtual target). `shared_control_param_sweep` runs an offline sweep over controller parameters before hardware trials.
 
-**Results.** [[Insert only after confirming conditions. Template:]]
+**Experiment.** One operator drove the spot from the centre to the outer boundary along +y (upward) and −y (downward), held for 1 s and returned. The two conditions share the platform, calibration and input scaling and differ only in four authority parameters (virtual-force gain, alpha start and full thresholds, post-violation return gain): `baseline` approximates near-manual operation with basic protection, `balanced` is the final shared-control set. Lateral tasks were excluded from the statistics because shoulder-servo heating made following unstable in that direction (see Known Limitations).
 
-| Condition | Trials | Mean maximum overshoot (px) | Notes |
-|---|---|---|---|
-| `baseline` | [[N]] | [[value]] | [[direction / task]] |
-| `[[condition]]` | [[N]] | [[value]] | |
-| `baseline` | [[N]] | [[value]] | [[second direction / task]] |
-| `[[condition]]` | [[N]] | [[value]] | |
+**Results** (from the thesis; mean over valid trials):
 
-Operators: [[number and who]]. Reproduce with `ros2 run arm_driver shared_control_experiment_analyzer --help`.
+| Task | Condition | Valid trials | Max. out-of-bound distance (px) | Out-of-bound duration (s) | Out-of-bound event rate | Completion time (s) |
+|---|---|---|---|---|---|---|
+| Upward | baseline | 9 | 12.54 | 1.41 | 77.78% | 29.88 |
+| Upward | shared control | 10 | 2.58 | 0.46 | 20.00% | 27.15 |
+| Downward | baseline | 8 | 15.00 | 1.68 | 100.00% | 23.65 |
+| Downward | shared control | 10 | 4.82 | 0.47 | 50.00% | 23.42 |
 
-### Offline demonstration (simulation, not bench data)
+![Per-trial maximum out-of-bound distance and duration, baseline vs shared control](docs/images/boundary_metrics.png)
 
-`docs/offline_demo/run_offline_demo.py` runs the closed-loop joystick/arm model from `shared_control_param_sweep.py` with the `baseline` and `balanced` parameter sets, using no ROS or hardware. The operator input is scripted: push +x at full deflection for 1.6 s, then release. It writes the figure below and `docs/offline_demo/offline_metrics.csv` (five scripted scenarios per configuration).
+![Alpha time histories, upward task](docs/images/alpha_histories_up.png)
 
-![Offline simulation: laser radius and authority alpha, baseline vs balanced](docs/offline_demo/offline_push_release.png)
-
-In this model, the balanced set holds the point closer to the boundary while the operator pushes outward and returns it inside sooner after release. The baseline peak is capped by the 320 px display limit. These values come from a simplified first-order arm model and say nothing about bench performance.
+Distances are in pixels of the virtual plane. Completion time did not increase under shared control. The downward task stayed riskier than the upward one under both conditions, which the thesis attributes to residual directional asymmetry, calibration error or small-sample variation rather than to the task itself. The raw rosbags from these trials were not retained, so the figures cannot be regenerated from this repository.
 
 ## Known Limitations
 
-- FSR contact/overpressure protection gates the grasping phases only: every shared-control parameter set sets `shared_control_bypass_fsr: true`, so it is not active during shared-control trials. In the current sensor config the left FSR is excluded from contact and overpressure decisions and sensor-fault detection is off.
+- FSR contact/overpressure protection gates the grasping phases only: every shared-control parameter set sets `shared_control_bypass_fsr: true`, so it is not active during shared-control trials. Sensor-fault detection is off in the current sensor config.
 - The target and laser point are virtual; overshoot is measured in screen pixels and is not converted to physical distance.
-- Validation was done on a desktop bench with [[N]] operator(s); it does not establish clinical benefit.
+- Results come from a single operator, 8–10 valid trials per condition and two task directions; they are prototype-stage evidence and do not establish clinical benefit.
+- The left FSR reads spuriously high because of passive gear linkage and mechanical preload, so contact and overpressure decisions use the right FSR only.
+- Lateral motion toward the base heats the shoulder servo and degrades following, so lateral tasks were not evaluated quantitatively.
 - Unit tests cover the shared-control law only (`arm_driver/test/test_shared_control_math.py`); the ROS nodes and hardware drivers are tested on the bench, not automatically.
 - `arm_gazebo.launch.py` is included but [[state whether the Gazebo path was verified]].
-- [[Any hardware limits observed, e.g. servo resolution or latency — only if measured]]
 
 ## Demo Material
 
-- [[Video: joystick operation with boundary return, ~1 min]]
-- [[Plot: laser trajectory and alpha over one trial, baseline vs shared control]]
-- [[Photo of the bench setup]]
+- Bench photo, ROS 2 architecture, per-trial metrics and alpha histories: `docs/images/` (figures from the thesis)
+- [[Video, if one exists]]
 
 ## Notes 
 
