@@ -4,7 +4,7 @@ An operator steers a small 4-DOF arm with a joystick while a virtual laser spot 
 
 **Scope.** This is my undergraduate thesis platform (SCUT / NUSRI, 2025–2026, supervised by Profs. Yong Zhong and Chui Chee Kong). It runs on a Raspberry Pi 4B and a physical desktop arm with a virtual (Pygame) task plane. It is a bench platform for studying shared control and is not a medical device and has not been tested in any clinical setting.
 
-Demo: [[video link, if one exists]] · Thesis: available on request
+Thesis: available on request
 
 ![Bench setup: the arm grips a two-axis joystick](docs/images/bench_setup.jpg)
 
@@ -47,9 +47,9 @@ Default shared-control plane: centre `(0.22, 0.00, 0.08) m`, workspace `x = 0.22
 
 | Part | Author |
 |---|---|
-| ROS 2 packages, node design, shared-control law, state machine, sensor processing, launch files, parameter sets, experiment tools | Me (Peiqi Huang) [[confirm; note any supervisor- or lab-provided code]] |
-| `arm_driver/arm_driver/fashion_star_sdk.py` | Fashion Star bus-servo Python SDK by the servo vendor (Shenzhen Huaxinjing Technology), used unmodified [[confirm]] |
-| Hardware: Raspberry Pi 4B, 4-DOF bus-servo arm, ADS1115 ADC, two FSRs, two-axis joystick | Commercial parts [[arm model]] |
+| ROS 2 packages, node design, shared-control law, state machine, sensor processing, launch files, parameter sets, experiment tools | Me (Peiqi Huang) |
+| `arm_driver/arm_driver/fashion_star_sdk.py` | Fashion Star bus-servo Python SDK by the servo vendor (Shenzhen Huaxinjing Technology), bundled for the servo protocol |
+| Hardware: Raspberry Pi 4B, 4-DOF bus-servo arm, ADS1115 ADC, two FSRs, two-axis joystick | Commercial parts (Fashion Star UART bus servos) |
 
 ## Requirements 
 
@@ -119,12 +119,11 @@ Distances are in pixels of the virtual plane. Completion time did not increase u
 - The left FSR reads spuriously high because of passive gear linkage and mechanical preload, so contact and overpressure decisions use the right FSR only.
 - Lateral motion toward the base heats the shoulder servo and degrades following, so lateral tasks were not evaluated quantitatively.
 - Unit tests cover the shared-control law only (`arm_driver/test/test_shared_control_math.py`); the ROS nodes and hardware drivers are tested on the bench, not automatically.
-- `arm_gazebo.launch.py` is included but [[state whether the Gazebo path was verified]].
+- `arm_gazebo.launch.py` is included but was not used in the thesis experiments, which ran on hardware only.
 
 ## Demo Material
 
-- Bench photo, ROS 2 architecture, per-trial metrics and alpha histories: `docs/images/` (figures from the thesis)
-- [[Video, if one exists]]
+- Bench photo, ROS 2 architecture, per-trial metrics and alpha histories: `docs/images/` (figures from the thesis). No video of the trials was kept.
 
 ## Notes 
 
