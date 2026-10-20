@@ -1,69 +1,61 @@
-# Robotic Arm Shared Control System
+# Shared Control for a 4-DOF Desktop Arm (ROS 2 Humble)
 
-This repository contains a ROS 2 Humble project for shared control of a small robotic arm. A human operator moves a joystick, the robotic gripper holds the joystick, and the system guides the motion inside a virtual safety boundary. When the virtual laser point moves outside the boundary, the controller switches to a machine-dominant return behavior.
+An operator steers a small 4-DOF arm with a joystick while a virtual laser spot must stay inside a circular safe region. The 2-D task is an abstraction motivated by retinal laser positioning: three concentric zones (safe, buffer, danger) rendered in Pygame, with no anatomical model. The arm holds the joystick, so the controller's safety correction is applied through the same joystick the operator is moving. Inside the boundary, operator input and correction are blended; outside it, the controller takes full authority and returns the point to the safe region.
 
-中文说明见文末的 [中文补充](#中文补充)。
+**Scope.** This is my undergraduate thesis platform (SCUT / NUSRI, 2025–2026, supervised by Profs. Yong Zhong and Chui Chee Kong). It runs on a Raspberry Pi 4B and a physical desktop arm with a virtual (Pygame) task plane. It is a bench platform for studying shared control and is not a medical device and has not been tested in any clinical setting.
 
-## Repository Layout
+Thesis: available on request
 
-```text
-.
-├── arm_driver/
-│   ├── arm_driver/          # Arm driver, shared control, virtual fixture, and tools
-│   ├── config/              # Parameter files for arm_control and pygame_haptic_sim
-│   ├── launch/              # ROS 2 launch files
-│   └── urdf/                # Arm model
-├── sensor_interface/
-│   ├── sensor_interface/    # ADS1115, joystick, and FSR acquisition nodes
-│   └── config/              # ADC and sensor parameter files
-└── README.md
-```
-
-Main ROS 2 packages:
-
-- `arm_driver`: serial servo driver, high-level arm control state machine, shared control, and Pygame virtual fixture.
-- `sensor_interface`: ADS1115 acquisition, joystick position publishing, and FSR contact/overpressure status publishing.
+![Bench setup: the arm grips a two-axis joystick](docs/images/bench_setup.jpg)
 
 ## System Overview
 
+![ROS 2 nodes and topics](docs/images/ros2_architecture.png)
+
 ```text
-Joystick -> ADS1115(A2/A3) -> hardware_adc_node -> /joy_position
-                                                        |
-                                                        v
-                                 pygame_haptic_sim_node -> /virtual_fixture_force
-                                                        -> /laser_position
-                                                        -> /shared_control_feedback
+Joystick -> ADS1115 (A2/A3) -> hardware_adc_node -> /joy_position
+                                                          |
+                                                          v
+                                   pygame_haptic_sim_node -> /virtual_fixture_force
+                                                          -> /laser_position
+                                                          -> /shared_control_feedback
 
-FSR -> ADS1115(A0/A1) -> hardware_adc_node -> /gripper_contact
-                                            -> /gripper_overpressure
-                                            -> /gripper_sensor_fault
+FSR x2   -> ADS1115 (A0/A1) -> hardware_adc_node -> /gripper_contact
+                                                 -> /gripper_overpressure
+                                                 -> /gripper_sensor_fault
 
-/joy_position + /virtual_fixture_force + FSR states -> arm_control_node -> arm_driver_node
+/joy_position + /virtual_fixture_force + FSR states -> arm_control_node -> arm_driver_node -> UART servos
 ```
 
-The shared control law is divided into two regions:
+| Node | Package | Role |
+|---|---|---|
+| `hardware_adc` | `sensor_interface` | Reads the ADS1115 over I2C; filters each channel (single-sample jumps are held until consecutive samples agree, then EMA); publishes joystick position and FSR contact (with hysteresis), overpressure and sensor-fault states |
+| `pygame_haptic_sim` | `arm_driver` | Integrates the virtual laser point, computes the virtual-fixture force and renders the target |
+| `arm_control` | `arm_driver` | State machine (INIT → HOME → TRANSIT → HOVER → GRASP/PINCH → SHARED_CONTROL, plus RETURN_* and SAFE_HOLD) and the shared-control law |
+| `arm_driver` | `arm_driver` | Inverse kinematics and the serial bus-servo driver |
 
-- Inside the boundary: the controller computes an authority factor `alpha` from the virtual fixture force and blends human input with the safety correction.
-- Outside the boundary: `alpha = 1`, so the machine fully takes over and pushes the joystick back toward the safe region.
+### Shared-control law
 
-Default shared-control plane:
+Implemented in `arm_driver/arm_driver/shared_control_math.py` (`compute_target_offset`):
 
-- Center: `(x, y, z) = (0.22, 0.00, 0.08) m`
-- Workspace: `x = 0.22 ± 0.016 m`, `y = 0.00 ± 0.016 m`
-- Fixed height: `z = 0.08 m`
+- **Inside the boundary:** an authority factor `alpha` in [0, 1] rises with the virtual-fixture force magnitude. The commanded offset is `(1 - alpha) * operator_offset + alpha * safety_correction`, clipped to the workspace.
+- **Outside the boundary:** `alpha = 1`; the controller pushes the point back toward the centre, with a push ratio that increases with the distance outside the boundary.
 
-## Requirements
+Default shared-control plane: centre `(0.22, 0.00, 0.08) m`, workspace `x = 0.22 ± 0.016 m`, `y = 0.00 ± 0.016 m`, fixed `z = 0.08 m`.
 
-Recommended environment:
+## My Contribution and Third-Party Components
 
-- Ubuntu 22.04
-- ROS 2 Humble
-- Python 3
-- ADS1115 I2C ADC
-- UART serial servo robotic arm
+| Part | Author |
+|---|---|
+| ROS 2 packages, node design, shared-control law, state machine, sensor processing, launch files, parameter sets, experiment tools | Me (Peiqi Huang) |
+| `arm_driver/arm_driver/fashion_star_sdk.py` | Fashion Star bus-servo Python SDK by the servo vendor (Shenzhen Huaxinjing Technology), bundled for the servo protocol |
+| Hardware: Raspberry Pi 4B, 4-DOF bus-servo arm, ADS1115 ADC, two FSRs, two-axis joystick | Commercial parts (Fashion Star UART bus servos) |
+
+## Requirements 
+
+- Ubuntu 22.04, ROS 2 Humble, Python 3
+- ADS1115 I2C ADC, UART bus-servo arm
 - Pygame, NumPy, pandas, matplotlib, seaborn, smbus2
-
-Example dependency installation:
 
 ```bash
 sudo apt update
@@ -73,127 +65,71 @@ sudo apt install -y \
   ros-humble-rosbag2-py ros-humble-rosidl-runtime-py
 ```
 
-## Build
-
-Clone this repository into a ROS 2 workspace:
+## Build and Run 
 
 ```bash
 mkdir -p ~/arm_project_ws/src
-git clone <repo-url> ~/arm_project_ws/src/arm_project
+git clone https://github.com/PatrickHuang-p7/eye-surgery-robot-shared-control ~/arm_project_ws/src/arm_project
 cd ~/arm_project_ws
 source /opt/ros/humble/setup.bash
 colcon build --packages-select arm_driver sensor_interface
 source install/setup.bash
+
+ros2 launch arm_driver system_launch.py                      # full system
+ros2 launch arm_driver system_launch.py arm_port:=/dev/serial0 pygame_sdl_video_driver:=dummy
+ros2 topic pub --once /arm_control_return_home std_msgs/msg/Bool "{data: true}"   # safe return before shutdown
 ```
 
-For SSH or headless sessions:
+Run the control-law unit tests without ROS or hardware:
 
 ```bash
-export SDL_VIDEODRIVER=dummy
+cd arm_driver && python3 -m pytest test/test_shared_control_math.py
 ```
 
-## Quick Start
+Without hardware, the boundary logic can be previewed with `python3 arm_driver/arm_driver/pygame_keyboard_preview.py`.
 
-Launch the full system:
+Parameter sets in `arm_driver/config/`: `baseline` (weak shared control, near-manual), `balanced` (default), `conservative` (stronger return), `responsive`.
 
-```bash
-ros2 launch arm_driver system_launch.py
-```
+## Validation
 
-Default parameter files:
+**Method.** Each trial is logged (`shared_control_trial_logger`, `shared_control_batch_bag_recorder`). `shared_control_experiment_analyzer` computes, per trial, out-of-boundary duration, boundary crossings, recovery time, peak alpha and the maximum overshoot (maximum laser radius minus safe-zone radius, in pixels of the virtual target). `shared_control_param_sweep` runs an offline sweep over controller parameters before hardware trials.
 
-- `arm_driver/config/arm_control_shared_balanced.yaml`
-- `arm_driver/config/pygame_haptic_sim_shared_debug.yaml`
-- `sensor_interface/config/hardware_adc_shared_debug.yaml`
+**Experiment.** One operator drove the spot from the centre to the outer boundary along +y (upward) and −y (downward), held for 1 s and returned. The two conditions share the platform, calibration and input scaling and differ only in four authority parameters (virtual-force gain, alpha start and full thresholds, post-violation return gain): `baseline` approximates near-manual operation with basic protection, `balanced` is the final shared-control set. Lateral tasks were excluded from the statistics because shoulder-servo heating made following unstable in that direction (see Known Limitations).
 
-Common launch overrides:
+**Results** (from the thesis; mean over valid trials):
 
-```bash
-ros2 launch arm_driver system_launch.py \
-  arm_port:=/dev/serial0 \
-  pygame_sdl_video_driver:=dummy
-```
+| Task | Condition | Valid trials | Max. out-of-bound distance (px) | Out-of-bound duration (s) | Out-of-bound event rate | Completion time (s) |
+|---|---|---|---|---|---|---|
+| Upward | baseline | 9 | 12.54 | 1.41 | 77.78% | 29.88 |
+| Upward | shared control | 10 | 2.58 | 0.46 | 20.00% | 27.15 |
+| Downward | baseline | 8 | 15.00 | 1.68 | 100.00% | 23.65 |
+| Downward | shared control | 10 | 4.82 | 0.47 | 50.00% | 23.42 |
 
-Use a real Pygame window instead of the dummy video driver:
+![Per-trial maximum out-of-bound distance and duration, baseline vs shared control](docs/images/boundary_metrics.png)
 
-```bash
-ros2 launch arm_driver system_launch.py pygame_sdl_video_driver:=x11
-```
+![Alpha time histories, upward task](docs/images/alpha_histories_up.png)
 
-## Main Commands
+Distances are in pixels of the virtual plane. Completion time did not increase under shared control. The downward task stayed riskier than the upward one under both conditions, which the thesis attributes to residual directional asymmetry, calibration error or small-sample variation rather than to the task itself. The raw rosbags from these trials were not retained, so the figures cannot be regenerated from this repository.
 
-Run nodes individually:
+## Known Limitations
 
-```bash
-ros2 run arm_driver arm_driver --ros-args -p serial_port:=/dev/serial0
-ros2 run sensor_interface hardware_adc
-ros2 run arm_driver pygame_haptic_sim
-ros2 run arm_driver arm_control
-```
+- FSR contact/overpressure protection gates the grasping phases only: every shared-control parameter set sets `shared_control_bypass_fsr: true`, so it is not active during shared-control trials. Sensor-fault detection is off in the current sensor config.
+- The target and laser point are virtual; overshoot is measured in screen pixels and is not converted to physical distance.
+- Results come from a single operator, 8–10 valid trials per condition and two task directions; they are prototype-stage evidence and do not establish clinical benefit.
+- The left FSR reads spuriously high because of passive gear linkage and mechanical preload, so contact and overpressure decisions use the right FSR only.
+- Lateral motion toward the base heats the shoulder servo and degrades following, so lateral tasks were not evaluated quantitatively.
+- Unit tests cover the shared-control law only (`arm_driver/test/test_shared_control_math.py`); the ROS nodes and hardware drivers are tested on the bench, not automatically.
+- `arm_gazebo.launch.py` is included but was not used in the thesis experiments, which ran on hardware only.
 
-Useful topics:
+## Demo Material
 
-```bash
-ros2 topic echo /joy_position
-ros2 topic echo /laser_position
-ros2 topic echo /virtual_fixture_force
-ros2 topic echo /shared_control_feedback
-ros2 topic echo /gripper_contact
-ros2 topic echo /gripper_overpressure
-ros2 topic echo /gripper_sensor_fault
-```
+- Bench photo, ROS 2 architecture, per-trial metrics and alpha histories: `docs/images/` (figures from the thesis). No video of the trials was kept.
 
-Trigger a safe return-home sequence:
-
-```bash
-ros2 topic pub --once /arm_control_return_home std_msgs/msg/Bool "{data: true}"
-```
-
-## Configurations
-
-Shared-control parameter sets:
-
-- `arm_driver/config/arm_control_shared_balanced.yaml`: default balanced setup.
-- `arm_driver/config/arm_control_shared_baseline.yaml`: weak shared control / near-manual baseline.
-- `arm_driver/config/arm_control_shared_conservative.yaml`: stronger return behavior.
-- `arm_driver/config/arm_control_shared_responsive.yaml`: more responsive behavior.
-
-Sensor parameters:
-
-- `sensor_interface/config/hardware_adc_shared_debug.yaml`
-
-Pygame virtual fixture parameters:
-
-- `arm_driver/config/pygame_haptic_sim_shared_debug.yaml`
-
-## Useful Tools
-
-Preview the virtual boundary logic on macOS or without ROS hardware:
-
-```bash
-python3 arm_driver/arm_driver/pygame_keyboard_preview.py
-```
-
-Run the offline shared-control parameter sweep:
-
-```bash
-python3 arm_driver/arm_driver/shared_control_param_sweep.py
-```
-
-Experiment analysis utilities are also exposed as ROS 2 console scripts:
-
-```bash
-ros2 run arm_driver shared_control_experiment_analyzer --help
-ros2 run arm_driver shared_control_experiment_plotter --help
-ros2 run arm_driver shared_control_batch_bag_recorder --help
-ros2 run arm_driver shared_control_trial_logger --help
-```
-
-## Notes
+## Notes 
 
 - If FSR thresholds are changed in `hardware_adc`, restart both `hardware_adc` and `arm_control`.
-- Before shutdown, publish `/arm_control_return_home` and wait for the arm to return to a safe pose.
-- Do not commit `build/`, `install/`, `log/`, rosbag files, experiment outputs, or cache files.
+- Before shutdown, publish `/arm_control_return_home` and wait for the arm to reach a safe pose.
+- Do not commit `build/`, `install/`, `log/`, rosbag files, experiment outputs or cache files.
 
 ## 中文补充
 
